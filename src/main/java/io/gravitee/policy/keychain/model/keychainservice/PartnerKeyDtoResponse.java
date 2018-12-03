@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.gravitee.policy.transformheaders.configuration;
+package io.gravitee.policy.keychain.model.keychainservice;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
- * @author David BRASSELY (david.brassely at graviteesource.com)
- * @author GraviteeSource Team
+ * @author Diogo Aihara (diogo at gr1d.io)
+ * @author gr1d.io team
  */
-public enum PolicyScope {
-    REQUEST,
-    RESPONSE
-}
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class PartnerKeyDtoResponse extends KeyChainResponse<PartnerKeyDto> {}

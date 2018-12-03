@@ -1,43 +1,17 @@
-= Transform Headers Policy
-
-ifdef::env-github[]
-image:https://ci.gravitee.io/buildStatus/icon?job=gravitee-io/gravitee-policy-transformheaders/master["Build status", link="https://ci.gravitee.io/job/gravitee-io/job/gravitee-policy-transformheaders/"]
-image:https://badges.gitter.im/Join Chat.svg["Gitter", link="https://gitter.im/gravitee-io/gravitee-io?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge"]
-endif::[]
+= Keychain Policy
 
 == Phase
 
-[cols="2*", options="header"]
 |===
-^|onRequest
-^|onResponse
-
-^.^| X
-^.^| X
-
+|onRequest|onResponse|onRequestContent|onResponseContent
+|X|||
 |===
 
 == Description
 
-The Transform Headers policy is used to override incoming request HTTP headers or outbound response HTTP headers.
-You can override these HTTP headers by:
+This policy intercepts the API requests on Gravitee API Gateway for retrieving the necessary credentials from the Keychain service for authenticating with partner services (that are behind the gateway).
 
-* Adding or updating list of headers
-* Removing them individually
+== Usage
 
-[source, json]
-.Sample
-----
-"transform-headers": {
-    "addHeaders": [
-        {
-            "name": "X-Gravitee-Request-Id",
-            "value": "{#request.id}"
-        }
-    ],
-    "removeHeaders": [
-        "X-Gravitee-TransactionId"
-    ],
-    "scope": "REQUEST"
-}
-----
+Given that the credentials are already registered on the Keychain service, there is no action needed besides inserting this policy into the required API operations.
+

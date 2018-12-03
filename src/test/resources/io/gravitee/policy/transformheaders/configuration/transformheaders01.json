@@ -1,9 +1,0 @@
-{
-  "removeHeaders": ["X-Gravitee-Test"],
-  "addHeaders": [
-    {
-      "name": "X-Gravitee-Added-Test",
-      "value": "Value"
-    }
-  ]
-}
