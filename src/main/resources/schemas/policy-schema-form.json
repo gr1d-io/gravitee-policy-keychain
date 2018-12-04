@@ -1,3 +1,14 @@
 {
-  
+  "type" : "object",
+  "id" : "urn:jsonschema:io:gravitee:policy:javascript:configuration:KeychainPolicyConfiguration",
+  "properties" : {
+    "KeychainURL": {
+      "title": "KeychainURL",
+      "description": "Keychain URL.",
+      "type": "string",
+      "x-schema-form": {
+        "type": "text"
+      }
+    }
+  }
 }

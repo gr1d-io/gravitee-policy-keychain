@@ -20,17 +20,17 @@ import java.util.*;
 
 /**
  * @author Diogo Aihara (diogo at gr1d.io)
+ * @author Alexandre Tolstenko (tolstenko at gr1d.io)
  * @author gr1d.io team
  */
 public class KeychainPolicyConfiguration implements PolicyConfiguration {
-    private Map<String, String> mappedKeys = new HashMap<String, String>();
+    private String KeychainURL;
 
-    public Map<String, String> getMappedKeys(){
-        return this.mappedKeys;
+    public String getKeychainURL(){
+        return this.KeychainURL;
     }
 
-    public void setMappedKeys(Map<String, String> mappedKeys) {
-        this.mappedKeys = mappedKeys;
+    public void setKeychainURL(String KeychainURL) {
+        this.KeychainURL = KeychainURL;
     }
-
 }

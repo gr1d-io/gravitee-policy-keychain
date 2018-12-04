@@ -15,13 +15,22 @@
  */
 package io.gravitee.policy.keychain;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Base64;
+
 
 import javax.naming.PartialResultException;
+import javax.net.ssl.HttpsURLConnection;
 
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,17 +46,15 @@ import io.gravitee.policy.keychain.model.keychainservice.PartnerKeyDtoResponse;
 
 /**
  * @author Diogo Aihara (diogo at gr1d.io)
+ * @author Alexandre Tolstenko (tolstenko at gr1d.io)
  * @author gr1d.io team
  */
 public class KeychainPolicy {
 
     private final KeychainPolicyConfiguration keychainPolicyConfiguration;
-    private final static String CONTEXT_NAME_API_KEY = "gravitee.attribute.api-key";
-    private final static String ENV_URL_SERVICE = "gr1d-keychain-url";
-    private final static String CREDENTIAL_USER_KEY = "user";
-    private final static String CREDENTIAL_PASS_KEY = "pass";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(KeychainPolicy.class);
+    private static final String METHOD = "method";
 
     public KeychainPolicy(KeychainPolicyConfiguration keychainPolicyConfiguration) {
         this.keychainPolicyConfiguration = keychainPolicyConfiguration;
@@ -55,26 +62,68 @@ public class KeychainPolicy {
 
     @OnRequest
     public void onRequest(Request request, Response response, ExecutionContext executionContext, PolicyChain policyChain) {
-        String url = null;
+        String url;
         PartnerKeyDtoResponse responseData = null;
         
-        // this.showRequestInfo(request, executionContext);
+        this.showRequestInfo(request, executionContext);
 
+//        gr1d-keychain-urlRestTemplate gr1d-keychain-url = new RestTemplate();
+//        responseData = restTemplate.getForObject(url, PartnerKeyDtoResponse.class);
+        // KeychainPolicy.LOGGER.warn(String.format("*** Response: %s", responseData.toString()));
+
+        int code=0;
+        try {
+            code = processRequest(request,executionContext);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        if(code==0)
+            return;
+        if(code==200)
+            policyChain.doNext(request, response);
+        //else if(code==403) todo: what should I do when it responses 403? abort request
+            //???
+    }
+
+    // TODO: Tolsta: this is not optimized, neither well done. I spent lots of time to make this work, so I did it as fast as I could.
+    public int processRequest(Request req, ExecutionContext executionContext) throws IOException {
         String api = executionContext.getAttribute(ExecutionContext.ATTR_API).toString();
         String application = executionContext.getAttribute(ExecutionContext.ATTR_APPLICATION).toString();
         String client = executionContext.getAttribute(ExecutionContext.ATTR_USER_ID).toString();
         String plan = executionContext.getAttribute(ExecutionContext.ATTR_PLAN).toString();
-        String serviceUrl = System.getenv(KeychainPolicy.ENV_URL_SERVICE);
-        url = String.format("%s/%s/%s/%s/%s", serviceUrl, client, application, plan, api);
-        // KeychainPolicy.LOGGER.warn(String.format("*** URL: %s", url));
-        
-//        gr1d-keychain-urlRestTemplate gr1d-keychain-url = new RestTemplate();
-//        responseData = restTemplate.getForObject(url, PartnerKeyDtoResponse.class);
-        // KeychainPolicy.LOGGER.warn(String.format("*** Response: %s", responseData.toString()));
-        
-        this.processKeychainResponse(responseData, request);
+        String serviceUrl = System.getenv(keychainPolicyConfiguration.getKeychainURL());
+        String url = serviceUrl+"/api/keychain/partnerkey/gravitee/" + client + "/" + api;
 
-        policyChain.doNext(request, response);
+        URL obj = new URL(url);
+        HttpsURLConnection con = (HttpsURLConnection) obj.openConnection();
+        con.setRequestMethod("POST");
+
+        BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+        String inputLine;
+        StringBuffer response = new StringBuffer();
+
+        while ((inputLine = in.readLine()) != null)
+            response.append(inputLine);
+        in.close();
+
+        JSONObject jsonObj = new JSONObject(response.toString());
+        JSONObject data = jsonObj.getJSONObject("data");
+        JSONObject apiData = data.getJSONObject("api").getJSONObject(api);
+
+        if(!data.getString("status").equals("enabled"))
+            return 403;
+
+        String method = data.getString("method");
+        if(method.equals("basicauth")) {
+            String user = apiData.getString("user");
+            String pass = apiData.getString("pass");
+            if(req.headers().containsKey("Authorization"))
+                req.headers().remove("Authorizadion");
+            req.headers().add("Authorization",
+                        "Basic " +  Base64.getEncoder().encode((user+":"+pass).getBytes()).toString());
+        }
+        return 200;
     }
 
     private void showRequestInfo(Request request, ExecutionContext executionContext) {
@@ -99,11 +148,9 @@ public class KeychainPolicy {
             executionContext.getAttribute(ExecutionContext.ATTR_API),
             executionContext.getAttribute(ExecutionContext.ATTR_USER_ID),
             executionContext.getAttribute(ExecutionContext.ATTR_PLAN),
-            executionContext.getAttribute(ExecutionContext.ATTR_APPLICATION),
-            executionContext.getAttribute(CONTEXT_NAME_API_KEY)
+            executionContext.getAttribute(ExecutionContext.ATTR_APPLICATION)
             );
         KeychainPolicy.LOGGER.warn(debugMessage);
-
     }
 
     private void processKeychainResponse(PartnerKeyDtoResponse responseData, Request request) {
@@ -111,20 +158,20 @@ public class KeychainPolicy {
         Map<String, String> credentials = partnerKeyDto.getCredentials();
         HttpHeaders headers = request.headers();
 
-        switch (partnerKeyDto.getAuthType()) {
-            case none:
-                break;
-            case user_pass:            
-                // se for user_pass, o usuário vem no credentialBase e o pass vem no credentialExtra
-                String userPass = String.format("%s:%s", credentials.get(KeychainPolicy.CREDENTIAL_USER_KEY), credentials.get(KeychainPolicy.CREDENTIAL_PASS_KEY));
-                String encodedHeader = Base64.getEncoder().encodeToString(userPass.getBytes());
-                headers.add("Authorization", String.format("Basic %s", encodedHeader));
-                break;
-            default:
-                this.insertHeaders(credentials, headers);
-                break;
-            
-        }
+//        switch (partnerKeyDto.getAuthType()) {
+//            case none:
+//                break;
+//            case user_pass:
+//                // se for user_pass, o usuário vem no credentialBase e o pass vem no credentialExtra
+//                String userPass = String.format("%s:%s", credentials.get(KeychainPolicy.CREDENTIAL_USER_KEY), credentials.get(KeychainPolicy.CREDENTIAL_PASS_KEY));
+//                String encodedHeader = Base64.getEncoder().encodeToString(userPass.getBytes());
+//                headers.add("Authorization", String.format("Basic %s", encodedHeader));
+//                break;
+//            default:
+//                this.insertHeaders(credentials, headers);
+//                break;
+//
+//        }
     }
 
     private void insertHeaders(Map<String, String> credentials, HttpHeaders headers) {
