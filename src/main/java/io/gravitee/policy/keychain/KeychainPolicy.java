@@ -64,10 +64,6 @@ public class KeychainPolicy {
         
         this.showRequestInfo(request, executionContext);
 
-//        gr1d-keychain-urlRestTemplate gr1d-keychain-url = new RestTemplate();
-//        responseData = restTemplate.getForObject(url, PartnerKeyDtoResponse.class);
-        // KeychainPolicy.LOGGER.warn(String.format("*** Response: %s", responseData.toString()));
-
         int code=0;
         try {
             code = processRequest(request,executionContext);
@@ -79,7 +75,8 @@ public class KeychainPolicy {
             return;
         if(code==200)
             policyChain.doNext(request, response);
-        //else if(code==403) todo: what should I do when it responses 403? abort request
+
+        //else if(code==403 || code == 400) todo: what should I do when it responses 403? abort request
             //???
     }
 
@@ -90,11 +87,12 @@ public class KeychainPolicy {
         String client = executionContext.getAttribute(ExecutionContext.ATTR_USER_ID).toString();
         String plan = executionContext.getAttribute(ExecutionContext.ATTR_PLAN).toString();
         String serviceUrl = System.getenv(keychainPolicyConfiguration.getKeychainURL());
-        String url = serviceUrl+"/api/keychain/partnerkey/gravitee/" + client + "/" + api;
+        // GET /api/keychain/partnerkey/gravitee/{graviteeId}/{apiId}/{appId}
+        String url = serviceUrl+"/api/keychain/partnerkey/gravitee/" + client + "/" + api + "/" + application;
 
         URL obj = new URL(url);
         HttpsURLConnection con = (HttpsURLConnection) obj.openConnection();
-        con.setRequestMethod("POST");
+        con.setRequestMethod("GET");
 
         BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
         String inputLine;
@@ -105,21 +103,16 @@ public class KeychainPolicy {
         in.close();
 
         JSONObject jsonObj = new JSONObject(response.toString());
-        JSONObject data = jsonObj.getJSONObject("data");
-        JSONObject apiData = data.getJSONObject("api").getJSONObject(api);
+        JSONObject apiData = jsonObj.getJSONArray("apis").optJSONObject(0);
 
-        if(!data.getString("status").equals("enabled"))
+        if(jsonObj.getJSONArray("errors").length()!=0)
+            return 400;
+
+        if(!jsonObj.getString("status").equals("enabled"))
             return 403;
 
-        String method = data.getString("method");
-        if(method.equals("basicauth")) {
-            String user = apiData.getString("user");
-            String pass = apiData.getString("pass");
-            if(req.headers().containsKey("Authorization"))
-                req.headers().remove("Authorizadion");
-            req.headers().add("Authorization",
-                        "Basic " +  Base64.getEncoder().encode((user+":"+pass).getBytes()).toString());
-        }
+        executionContext.setAttribute("keychain",apiData.toString());
+
         return 200;
     }
 
