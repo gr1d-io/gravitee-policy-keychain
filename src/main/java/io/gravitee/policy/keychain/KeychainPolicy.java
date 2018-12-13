@@ -20,10 +20,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Base64;
 
 
@@ -151,6 +148,12 @@ public class KeychainPolicy {
             executionContext.getAttribute(ExecutionContext.ATTR_APPLICATION)
             );
         KeychainPolicy.LOGGER.warn(debugMessage);
+
+        String attributes="";
+        for (Enumeration<String> enumeration = executionContext.getAttributeNames(); enumeration.hasMoreElements(); )
+            attributes += enumeration.nextElement() + " ";
+
+        KeychainPolicy.LOGGER.debug(attributes);
     }
 
     private void processKeychainResponse(PartnerKeyDtoResponse responseData, Request request) {
