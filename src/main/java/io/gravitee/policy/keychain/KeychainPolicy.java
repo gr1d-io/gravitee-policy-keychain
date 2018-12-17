@@ -27,6 +27,9 @@ import java.util.Base64;
 import javax.naming.PartialResultException;
 import javax.net.ssl.HttpsURLConnection;
 
+import io.gravitee.common.http.HttpStatusCode;
+import io.gravitee.policy.api.PolicyResult;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,34 +64,26 @@ public class KeychainPolicy {
     public void onRequest(Request request, Response response, ExecutionContext executionContext, PolicyChain policyChain) {
         String url;
         PartnerKeyDtoResponse responseData = null;
-        
-        this.showRequestInfo(request, executionContext);
 
-        int code=0;
+        //this.showRequestInfo(request, executionContext);
+
         try {
-            code = processRequest(request,executionContext);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        if(code==0)
+            if(processRequest(request,executionContext, policyChain))
+                policyChain.doNext(request, response);
+        } catch (Exception e) {
+            // in case it fails not so gracefully
+            policyChain.failWith(PolicyResult.failure(HttpStatusCode.INTERNAL_SERVER_ERROR_500, e.getMessage()));
             return;
-        if(code==200)
-            policyChain.doNext(request, response);
-
-        //else if(code==403 || code == 400) todo: what should I do when it responses 403? abort request
-            //???
+        }
     }
 
     // TODO: Tolsta: this is not optimized, neither well done. I spent lots of time to make this work, so I did it as fast as I could.
-    public int processRequest(Request req, ExecutionContext executionContext) throws IOException {
+    public boolean processRequest(Request req, ExecutionContext executionContext, PolicyChain policyChain) throws IOException {
         String api = executionContext.getAttribute(ExecutionContext.ATTR_API).toString();
         String application = executionContext.getAttribute(ExecutionContext.ATTR_APPLICATION).toString();
         String client = executionContext.getAttribute(ExecutionContext.ATTR_USER_ID).toString();
-        String plan = executionContext.getAttribute(ExecutionContext.ATTR_PLAN).toString();
         String serviceUrl = System.getenv(keychainPolicyConfiguration.getKeychainURL());
-        // GET /api/keychain/partnerkey/gravitee/{graviteeId}/{apiId}/{appId}
-        String url = serviceUrl+"/api/keychain/partnerkey/gravitee/" + client + "/" + api + "/" + application;
+        String url = serviceUrl+"/api/gravitee/" + client + "/" + application + "/" + api;
 
         URL obj = new URL(url);
         HttpsURLConnection con = (HttpsURLConnection) obj.openConnection();
@@ -96,24 +91,33 @@ public class KeychainPolicy {
 
         BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
         String inputLine;
-        StringBuffer response = new StringBuffer();
+        StringBuilder response = new StringBuilder();
 
         while ((inputLine = in.readLine()) != null)
             response.append(inputLine);
         in.close();
 
         JSONObject jsonObj = new JSONObject(response.toString());
-        JSONObject apiData = jsonObj.getJSONArray("apis").optJSONObject(0);
+        JSONArray apiData = jsonObj.getJSONArray("apis");
+        JSONArray errors = jsonObj.getJSONArray("errors");
+        String status = jsonObj.getString("status");
 
-        if(jsonObj.getJSONArray("errors").length()!=0)
-            return 400;
+        // check for errors
+        if(errors.length()!=0)
+            policyChain.failWith(PolicyResult.failure(HttpStatusCode.INTERNAL_SERVER_ERROR_500, errors.toString()));
+        // check if user is enabled
+        else if(!status.equals("enabled"))
+            policyChain.failWith(PolicyResult.failure(HttpStatusCode.PAYMENT_REQUIRED_402, "USER DISABLED: " + status));
+        // check if there is content to chain
+        else if(apiData.length()==0)
+            policyChain.failWith(PolicyResult.failure(HttpStatusCode.INTERNAL_SERVER_ERROR_500,"No keychain found for this APP & API."));
+        // set keychain data
+        else {
+            executionContext.setAttribute("keychain", apiData.toString());
+            return true;
+        }
 
-        if(!jsonObj.getString("status").equals("enabled"))
-            return 403;
-
-        executionContext.setAttribute("keychain",apiData.toString());
-
-        return 200;
+        return false;
     }
 
     private void showRequestInfo(Request request, ExecutionContext executionContext) {
