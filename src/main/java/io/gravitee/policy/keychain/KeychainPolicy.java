@@ -63,17 +63,17 @@ public class KeychainPolicy {
     @OnRequest
     public void onRequest(Request request, Response response, ExecutionContext executionContext, PolicyChain policyChain) {
         String url;
-        PartnerKeyDtoResponse responseData = null;
-
         //this.showRequestInfo(request, executionContext);
+
+        KeychainPolicy.LOGGER.warn("preprocess" );
 
         try {
             if(processRequest(request,executionContext, policyChain))
                 policyChain.doNext(request, response);
         } catch (Exception e) {
             // in case it fails not so gracefully
+            KeychainPolicy.LOGGER.error(e.getMessage());
             policyChain.failWith(PolicyResult.failure(HttpStatusCode.INTERNAL_SERVER_ERROR_500, e.getMessage()));
-            return;
         }
     }
 
@@ -82,8 +82,9 @@ public class KeychainPolicy {
         String api = executionContext.getAttribute(ExecutionContext.ATTR_API).toString();
         String application = executionContext.getAttribute(ExecutionContext.ATTR_APPLICATION).toString();
         String client = executionContext.getAttribute(ExecutionContext.ATTR_USER_ID).toString();
-        String serviceUrl = System.getenv(keychainPolicyConfiguration.getKeychainURL());
-        String url = serviceUrl+"/api/gravitee/" + client + "/" + application + "/" + api;
+        String url = "https://keychain.dev.gr1d.io/api/gravitee/" + client + "/" + application + "/" + api;
+
+        KeychainPolicy.LOGGER.warn("keychainurl: " + url);
 
         URL obj = new URL(url);
         HttpsURLConnection con = (HttpsURLConnection) obj.openConnection();
@@ -97,7 +98,11 @@ public class KeychainPolicy {
             response.append(inputLine);
         in.close();
 
-        JSONObject jsonObj = new JSONObject(response.toString());
+        String responseString = response.toString();
+
+        KeychainPolicy.LOGGER.warn("response: " + responseString);
+
+        JSONObject jsonObj = new JSONObject(responseString);
         JSONArray apiData = jsonObj.getJSONArray("apis");
         JSONArray errors = jsonObj.getJSONArray("errors");
         String status = jsonObj.getString("status");
