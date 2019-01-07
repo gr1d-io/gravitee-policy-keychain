@@ -15,18 +15,6 @@
  */
 package io.gravitee.policy.keychain;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.*;
-import java.util.Base64;
-
-
-import javax.naming.PartialResultException;
-import javax.net.ssl.HttpsURLConnection;
-
 import io.gravitee.common.http.HttpStatusCode;
 import io.gravitee.policy.api.PolicyResult;
 import org.json.JSONArray;
@@ -34,15 +22,16 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.gravitee.common.http.HttpHeaders;
+import io.vertx.core.Vertx;
+import io.vertx.core.buffer.Buffer;
+import io.vertx.core.http.HttpClient;
+import io.vertx.core.Handler;
 import io.gravitee.gateway.api.ExecutionContext;
 import io.gravitee.gateway.api.Request;
 import io.gravitee.gateway.api.Response;
 import io.gravitee.policy.api.PolicyChain;
 import io.gravitee.policy.api.annotations.OnRequest;
 import io.gravitee.policy.keychain.configuration.KeychainPolicyConfiguration;
-import io.gravitee.policy.keychain.model.keychainservice.PartnerKeyDto;
-import io.gravitee.policy.keychain.model.keychainservice.PartnerKeyDtoResponse;
 
 /**
  * @author Diogo Aihara (diogo at gr1d.io)
@@ -54,7 +43,11 @@ public class KeychainPolicy {
     private final KeychainPolicyConfiguration keychainPolicyConfiguration;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(KeychainPolicy.class);
-    private static final String METHOD = "method";
+    private static final String KEYCHAIN_KEY = "keychain";
+    private static final String APIS_KEY = "apis";
+    private static final String ERRORS_KEY = "errors";
+    private static final String STATUS_KEY = "status";
+    private static final String DEFAULT_KEYCHAIN_URL = "https://keychain.dev.gr1d.io";
 
     public KeychainPolicy(KeychainPolicyConfiguration keychainPolicyConfiguration) {
         this.keychainPolicyConfiguration = keychainPolicyConfiguration;
@@ -62,126 +55,65 @@ public class KeychainPolicy {
 
     @OnRequest
     public void onRequest(Request request, Response response, ExecutionContext executionContext, PolicyChain policyChain) {
-        String url;
-        //this.showRequestInfo(request, executionContext);
-
-        KeychainPolicy.LOGGER.warn("preprocess" );
-
-        try {
-            if(processRequest(request,executionContext, policyChain))
-                policyChain.doNext(request, response);
-        } catch (Exception e) {
-            // in case it fails not so gracefully
-            KeychainPolicy.LOGGER.error(e.getMessage());
-            policyChain.failWith(PolicyResult.failure(HttpStatusCode.INTERNAL_SERVER_ERROR_500, e.getMessage()));
-        }
-    }
-
-    // TODO: Tolsta: this is not optimized, neither well done. I spent lots of time to make this work, so I did it as fast as I could.
-    public boolean processRequest(Request req, ExecutionContext executionContext, PolicyChain policyChain) throws IOException {
         String api = executionContext.getAttribute(ExecutionContext.ATTR_API).toString();
         String application = executionContext.getAttribute(ExecutionContext.ATTR_APPLICATION).toString();
         String client = executionContext.getAttribute(ExecutionContext.ATTR_USER_ID).toString();
-        String url = "https://keychain.dev.gr1d.io/api/gravitee/" + client + "/" + application + "/" + api;
-
-        KeychainPolicy.LOGGER.warn("keychainurl: " + url);
-
-        URL obj = new URL(url);
-        HttpsURLConnection con = (HttpsURLConnection) obj.openConnection();
-        con.setRequestMethod("GET");
-
-        BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
-        String inputLine;
-        StringBuilder response = new StringBuilder();
-
-        while ((inputLine = in.readLine()) != null)
-            response.append(inputLine);
-        in.close();
-
-        String responseString = response.toString();
-
-        KeychainPolicy.LOGGER.warn("response: " + responseString);
-
-        JSONObject jsonObj = new JSONObject(responseString);
-        JSONArray apiData = jsonObj.getJSONArray("apis");
-        JSONArray errors = jsonObj.getJSONArray("errors");
-        String status = jsonObj.getString("status");
-
-        // check for errors
-        if(errors.length()!=0)
-            policyChain.failWith(PolicyResult.failure(HttpStatusCode.INTERNAL_SERVER_ERROR_500, errors.toString()));
-        // check if user is enabled
-        else if(!status.equals("enabled"))
-            policyChain.failWith(PolicyResult.failure(HttpStatusCode.PAYMENT_REQUIRED_402, "USER DISABLED: " + status));
-        // check if there is content to chain
-        else if(apiData.length()==0)
-            policyChain.failWith(PolicyResult.failure(HttpStatusCode.INTERNAL_SERVER_ERROR_500,"No keychain found for this APP & API."));
-        // set keychain data
-        else {
-            executionContext.setAttribute("keychain", apiData.toString());
-            return true;
+        String keychainUrl = this.keychainPolicyConfiguration.getKeychainURL();
+        if ((keychainUrl == null) || (keychainUrl.length() == 0)) {
+            keychainUrl = KeychainPolicy.DEFAULT_KEYCHAIN_URL;
         }
+        String url = String.format("%s/api/gravitee/%s/%s/%s", keychainUrl, client, application, api);
 
-        return false;
-    }
-
-    private void showRequestInfo(Request request, ExecutionContext executionContext) {
-        HttpHeaders headers = request.headers();
-        String debugMessage = "*** HEADERS\n";
-        for (String key : headers.keySet()) {
-            String value = headers.getFirst(key);
-            debugMessage += String.format("- %s: %s\n", key, value);
-        }
-        KeychainPolicy.LOGGER.warn(debugMessage);
+        KeychainPolicy.LOGGER.warn("[Keychain] URL: " + url);
         
-        debugMessage = "*** Exection Context Attributes\n";
-        List<String> executionContextAttributeNames = Collections.list(executionContext.getAttributeNames());
-        for(String key : executionContextAttributeNames) {
-            debugMessage += String.format("- %s: %s\n", key, executionContext.getAttribute(key));
+        try{
+            Vertx vertx = Vertx.currentContext().owner();
+           // Vertx vertx = Vertx.vertx();
+            HttpClient httpClient = vertx.createHttpClient();
+            
+            httpClient.getAbs(url)
+            .handler(res -> {
+                if (res.statusCode() < 500) {
+                    res.bodyHandler(new Handler<Buffer>() {
+                        @Override
+                        public void handle(Buffer buffer) {
+                            JSONObject jsonObj = new JSONObject(buffer.toString());
+                            String status =  jsonObj.isNull(KeychainPolicy.STATUS_KEY) ? "disabled" : jsonObj.getString(KeychainPolicy.STATUS_KEY);
+                            JSONArray errors = jsonObj.isNull(KeychainPolicy.STATUS_KEY) ? new JSONArray() : jsonObj.getJSONArray(KeychainPolicy.ERRORS_KEY);
+                            JSONArray apis = jsonObj.isNull(KeychainPolicy.APIS_KEY) ? new JSONArray() : jsonObj.getJSONArray(KeychainPolicy.APIS_KEY);
+
+                            // check for errors
+                            if(errors.length()!=0) {
+                                policyChain.failWith(PolicyResult.failure(HttpStatusCode.INTERNAL_SERVER_ERROR_500, errors.toString()));
+                            }
+                            // check if user is enabled
+                            else if(!status.equals("enabled")) {
+                                policyChain.failWith(PolicyResult.failure(HttpStatusCode.PAYMENT_REQUIRED_402, "USER DISABLED: " + status));
+                            }
+                            // check if there is content to chain
+                            else if (apis.length() == 0) {
+                                policyChain.failWith(PolicyResult.failure(HttpStatusCode.INTERNAL_SERVER_ERROR_500,"No keychain found for this APP & API."));
+                            }
+                            // set keychain data
+                            else {
+                                KeychainPolicy.LOGGER.warn("[Keychain] setAttribute");
+                                executionContext.setAttribute(KeychainPolicy.KEYCHAIN_KEY, apis.toString());
+                                policyChain.doNext(request, response);
+                            }
+                            
+                        }
+                    });
+                }
+                else {
+                    policyChain.failWith(PolicyResult.failure(HttpStatusCode.INTERNAL_SERVER_ERROR_500,"Error on reading keychain data."));
+                }
+                
+            })
+            .end();
         }
-        KeychainPolicy.LOGGER.warn(debugMessage);
-        
-
-        debugMessage = String.format(
-            "*** Variáveis:\n- ATTR_API: %s\n- ATTR_USER_ID: %s\n- ATTR_PLAN: %s\n- ATTR_APPLICATION: %s\n- X-GRAVITEE-API-KEY: %s",
-            executionContext.getAttribute(ExecutionContext.ATTR_API),
-            executionContext.getAttribute(ExecutionContext.ATTR_USER_ID),
-            executionContext.getAttribute(ExecutionContext.ATTR_PLAN),
-            executionContext.getAttribute(ExecutionContext.ATTR_APPLICATION)
-            );
-        KeychainPolicy.LOGGER.warn(debugMessage);
-
-        String attributes="";
-        for (Enumeration<String> enumeration = executionContext.getAttributeNames(); enumeration.hasMoreElements(); )
-            attributes += enumeration.nextElement() + " ";
-
-        KeychainPolicy.LOGGER.debug(attributes);
-    }
-
-    private void processKeychainResponse(PartnerKeyDtoResponse responseData, Request request) {
-        PartnerKeyDto partnerKeyDto = responseData.getData();
-        Map<String, String> credentials = partnerKeyDto.getCredentials();
-        HttpHeaders headers = request.headers();
-
-//        switch (partnerKeyDto.getAuthType()) {
-//            case none:
-//                break;
-//            case user_pass:
-//                // se for user_pass, o usuário vem no credentialBase e o pass vem no credentialExtra
-//                String userPass = String.format("%s:%s", credentials.get(KeychainPolicy.CREDENTIAL_USER_KEY), credentials.get(KeychainPolicy.CREDENTIAL_PASS_KEY));
-//                String encodedHeader = Base64.getEncoder().encodeToString(userPass.getBytes());
-//                headers.add("Authorization", String.format("Basic %s", encodedHeader));
-//                break;
-//            default:
-//                this.insertHeaders(credentials, headers);
-//                break;
-//
-//        }
-    }
-
-    private void insertHeaders(Map<String, String> credentials, HttpHeaders headers) {
-        for(Map.Entry<String, String> entry : credentials.entrySet()) {
-            headers.add(entry.getKey(), entry.getValue());
+        catch (Exception e) {
+            KeychainPolicy.LOGGER.warn("[Keychain] *** ERROR ***: " +e.getLocalizedMessage());    
+            policyChain.failWith(PolicyResult.failure(HttpStatusCode.INTERNAL_SERVER_ERROR_500,"Error on reading keychain data."));
         }
-    }
+    }    
 }
