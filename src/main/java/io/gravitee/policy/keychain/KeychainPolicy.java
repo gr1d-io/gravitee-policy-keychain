@@ -47,7 +47,7 @@ public class KeychainPolicy {
     private static final String APIS_KEY = "apis";
     private static final String ERRORS_KEY = "errors";
     private static final String STATUS_KEY = "status";
-    private static final String DEFAULT_KEYCHAIN_URL = "https://keychain.dev.gr1d.io";
+    private static final String DEFAULT_KEYCHAIN_URL = "https://keychain.gr1d.io";
 
     public KeychainPolicy(KeychainPolicyConfiguration keychainPolicyConfiguration) {
         this.keychainPolicyConfiguration = keychainPolicyConfiguration;
@@ -59,7 +59,7 @@ public class KeychainPolicy {
         String application = executionContext.getAttribute(ExecutionContext.ATTR_APPLICATION).toString();
         String client = executionContext.getAttribute(ExecutionContext.ATTR_USER_ID).toString();
         String keychainUrl = this.keychainPolicyConfiguration.getKeychainURL();
-        if ((keychainUrl == null) || (keychainUrl.length() == 0)) {
+        if (keychainUrl == null || keychainUrl.isEmpty()) {
             keychainUrl = KeychainPolicy.DEFAULT_KEYCHAIN_URL;
         }
         String url = String.format("%s/api/gravitee/%s/%s/%s", keychainUrl, client, application, api);
