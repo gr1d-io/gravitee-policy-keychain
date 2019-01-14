@@ -59,6 +59,9 @@ public class KeychainPolicy {
         String application = executionContext.getAttribute(ExecutionContext.ATTR_APPLICATION).toString();
         String client = executionContext.getAttribute(ExecutionContext.ATTR_USER_ID).toString();
         String keychainUrl = this.keychainPolicyConfiguration.getKeychainURL();
+        
+        KeychainPolicy.LOGGER.warn("[Keychain] From Config: " + keychainUrl);
+        
         if (keychainUrl == null || keychainUrl.isEmpty()) {
             keychainUrl = KeychainPolicy.DEFAULT_KEYCHAIN_URL;
         }
