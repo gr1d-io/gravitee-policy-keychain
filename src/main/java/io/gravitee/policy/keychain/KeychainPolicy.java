@@ -70,8 +70,7 @@ public class KeychainPolicy {
         KeychainPolicy.LOGGER.warn("[Keychain] URL: " + url);
         
         try{
-            Vertx vertx = Vertx.currentContext().owner();
-           // Vertx vertx = Vertx.vertx();
+            Vertx vertx = Vertx.currentContext().owner();            
             HttpClient httpClient = vertx.createHttpClient();
             
             httpClient.getAbs(url)
@@ -111,6 +110,10 @@ public class KeychainPolicy {
                     policyChain.failWith(PolicyResult.failure(HttpStatusCode.INTERNAL_SERVER_ERROR_500,"Error on reading keychain data."));
                 }
                 
+            })
+            .exceptionHandler(e -> {
+                KeychainPolicy.LOGGER.warn("[Keychain] *** ERROR ***: " +e.getLocalizedMessage());    
+                policyChain.failWith(PolicyResult.failure(HttpStatusCode.INTERNAL_SERVER_ERROR_500,"Error on reading keychain data."));
             })
             .end();
         }
