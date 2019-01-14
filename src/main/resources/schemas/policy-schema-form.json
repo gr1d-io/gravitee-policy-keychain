@@ -2,7 +2,7 @@
   "type" : "object",
   "id" : "urn:jsonschema:io:gravitee:policy:javascript:configuration:KeychainPolicyConfiguration",
   "properties" : {
-    "KeychainURL": {
+    "keychainUrl": {
       "title": "KeychainURL",
       "description": "Keychain URL.",
       "type": "string",

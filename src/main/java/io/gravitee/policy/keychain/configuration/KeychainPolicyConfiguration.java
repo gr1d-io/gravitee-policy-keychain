@@ -23,13 +23,13 @@ import io.gravitee.policy.api.PolicyConfiguration;
  * @author gr1d.io team
  */
 public class KeychainPolicyConfiguration implements PolicyConfiguration {
-    private String KeychainURL;
+    private String keychainUrl;
 
-    public String getKeychainURL(){
-        return this.KeychainURL;
+    public String getKeychainUrl(){
+        return this.keychainUrl;
     }
 
-    public void setKeychainURL(String KeychainURL) {
-        this.KeychainURL = KeychainURL;
+    public void setKeychainUrl(String keychainUrl) {
+        this.keychainUrl = keychainUrl;
     }
 }
