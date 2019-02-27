@@ -30,6 +30,7 @@ import io.gravitee.gateway.api.ExecutionContext;
 import io.gravitee.gateway.api.Request;
 import io.gravitee.gateway.api.Response;
 import io.gravitee.policy.api.PolicyChain;
+import io.gravitee.policy.api.PolicyConfiguration;
 import io.gravitee.policy.api.annotations.OnRequest;
 import io.gravitee.policy.keychain.configuration.KeychainPolicyConfiguration;
 
@@ -49,8 +50,8 @@ public class KeychainPolicy {
     private static final String STATUS_KEY = "status";
     private static final String DEFAULT_KEYCHAIN_URL = "https://keychain.gr1d.io";
 
-    public KeychainPolicy(KeychainPolicyConfiguration keychainPolicyConfiguration) {
-        this.keychainPolicyConfiguration = keychainPolicyConfiguration;
+    public KeychainPolicy(PolicyConfiguration keychainPolicyConfiguration) {
+        this.keychainPolicyConfiguration = (KeychainPolicyConfiguration)keychainPolicyConfiguration;
     }
 
     @OnRequest
