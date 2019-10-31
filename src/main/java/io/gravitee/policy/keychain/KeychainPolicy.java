@@ -120,6 +120,10 @@ public class KeychainPolicy {
                 if (!status.equals("enabled") && hasEntry) {
                   policyChain.failWith(PolicyResult.failure(HttpStatusCode.PAYMENT_REQUIRED_402,
                       "USER DISABLED: " + status));
+                } else if (hasEntry) {
+                  KeychainPolicy.LOGGER.warn("[Keychain] setAttribute");
+                  executionContext.setAttribute(KeychainPolicy.KEYCHAIN_KEY, apis.toString());
+                  policyChain.doNext(request, response);
                 }
                 // set the default keychain data
                 else {
@@ -129,6 +133,7 @@ public class KeychainPolicy {
                       application, api, keychainPolicyConfiguration.getMethod().getName()));
 
                   if (keychainPolicyConfiguration.getAddParameters() != null) {
+                    KeychainPolicy.LOGGER.warn("[Keychain] AddParameters != null");
                     keychainPolicyConfiguration.getAddParameters().forEach(queryParameter -> {
                       if (queryParameter.getName() != null
                           && !queryParameter.getName().trim().isEmpty()) {
