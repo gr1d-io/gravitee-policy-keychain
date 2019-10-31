@@ -15,6 +15,8 @@
  */
 package io.gravitee.policy.keychain.configuration;
 
+import java.util.ArrayList;
+import java.util.List;
 import io.gravitee.policy.api.PolicyConfiguration;
 
 /**
@@ -24,6 +26,33 @@ import io.gravitee.policy.api.PolicyConfiguration;
  */
 public class KeychainPolicyConfiguration implements PolicyConfiguration {
     private String keychainUrl;
+    private boolean mandatory;
+    private DefaultMethod method;
+    private List<DefaultParameter> addParameters = new ArrayList<>();
+
+    public List<DefaultParameter> getAddParameters() {
+      return addParameters;
+    }
+
+    public void setAddParameters(List<DefaultParameter> addParameters) {
+      this.addParameters = addParameters;
+    }
+
+    public DefaultMethod getMethod() {
+        return method;
+    }
+
+    public void setMethod(DefaultMethod method) {
+        this.method = method;
+    }
+
+    public boolean getMandatory() {
+      return mandatory;
+    }
+
+    public void setMandatory(boolean mandatory) {
+      this.mandatory = mandatory;
+    }
 
     public String getKeychainUrl(){
         return this.keychainUrl;

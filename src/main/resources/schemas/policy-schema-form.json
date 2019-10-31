@@ -1,14 +1,54 @@
 {
-  "type" : "object",
-  "id" : "urn:jsonschema:io:gravitee:policy:javascript:configuration:KeychainPolicyConfiguration",
-  "properties" : {
-    "keychainUrl": {
-      "title": "KeychainURL",
-      "description": "Keychain URL.",
-      "type": "string",
-      "x-schema-form": {
-        "type": "text"
-      }
-    }
-  }
+	"type": "object",
+	"id": "urn:jsonschema:io:gravitee:policy:javascript:configuration:KeychainPolicyConfiguration",
+	"properties": {
+		"keychainUrl": {
+			"title": "KeychainURL",
+			"description": "Keychain URL.",
+			"type": "string",
+			"x-schema-form": {
+				"type": "text"
+			}
+		},
+		"mandatory": {
+			"title": "Mandatory",
+			"description": "Check if every user needs a keychain entry.",
+			"type": "boolean"
+		},
+		"method": {
+			"title": "Default method",
+			"description": "Used as default properties when a keychain was not set for the transaction subscription.",
+			"type": "string",
+			"default": "HEADER",
+			"enum": [
+				"BASICAUTH",
+				"HEADER",
+				"QUERY"
+			]
+		},
+		"addParameters": {
+			"type": "array",
+			"title": "Add default parameter",
+			"description": "Used in case there is no keychain entry for a specific user.",
+			"items": {
+				"type": "object",
+				"id": "urn:jsonschema:io:gravitee:policy:keychain:configuration:DefaultParameter",
+				"title": "Default Parameter",
+				"properties": {
+					"name": {
+						"title": "Name",
+						"type": "string"
+					},
+					"value": {
+						"title": "Value",
+						"type": "string"
+					}
+				},
+				"required": [
+					"name",
+					"value"
+				]
+			}
+		}
+	}
 }
