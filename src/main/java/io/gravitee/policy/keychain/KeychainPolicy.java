@@ -96,7 +96,7 @@ public class KeychainPolicy {
                     errors.toString()));
               }
 
-              if (!keychainPolicyConfiguration.getMandatory()) {
+              if (keychainPolicyConfiguration.getMandatory()) {
 
                 // check if user is enabled
                 if (!status.equals("enabled")) {
