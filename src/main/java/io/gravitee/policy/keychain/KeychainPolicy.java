@@ -95,6 +95,8 @@ public class KeychainPolicy {
                 policyChain.failWith(PolicyResult.failure(HttpStatusCode.INTERNAL_SERVER_ERROR_500,
                     errors.toString()));
               }
+              
+              KeychainPolicy.LOGGER.warn("[Keychain] if mandatory");
 
               if (keychainPolicyConfiguration.getMandatory()) {
 
@@ -116,6 +118,7 @@ public class KeychainPolicy {
                   policyChain.doNext(request, response);
                 }
               } else {
+                KeychainPolicy.LOGGER.warn("[Keychain] else not mandatory");
                 // check if user is disabled, having an entry in keychain
                 if (!status.equals("enabled") && hasEntry) {
                   policyChain.failWith(PolicyResult.failure(HttpStatusCode.PAYMENT_REQUIRED_402,
@@ -132,6 +135,7 @@ public class KeychainPolicy {
                       "[{\"_Gr1d_appId\": \"%s\", \"_Gr1d_apiId\": \"%s\", \"_Gr1d_method\": \"%s\"",
                       application, api, keychainPolicyConfiguration.getMethod().getName()));
 
+                  KeychainPolicy.LOGGER.warn("[Keychain] default set after format create");
                   if (keychainPolicyConfiguration.getAddParameters() != null) {
                     KeychainPolicy.LOGGER.warn("[Keychain] AddParameters != null");
                     keychainPolicyConfiguration.getAddParameters().forEach(queryParameter -> {
