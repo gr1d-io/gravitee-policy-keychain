@@ -161,6 +161,7 @@ public class KeychainPolicy {
                       }
                     });
                   }
+                  KeychainPolicy.LOGGER.warn("[Keychain] finish append");
                   format.append("}]");
                   KeychainPolicy.LOGGER
                       .warn("[Keychain] default keychain context " + format.toString());
